@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora 3D</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #141418;
+    --card: #1a1a20;
+    --border: #2a2a35;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --green: #4ade80;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+    /* Resin */
+    --accent-r: #ff6b2b;
+    --accent-r2: #ffb347;
+    /* FDM */
+    --accent-f: #38bdf8;
+    --accent-f2: #818cf8;
+    /* active mode */
+    --accent: #ff6b2b;
+    --accent2: #ffb347;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -40%; right: -20%;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(255,107,43,0.07) 0%, transparent 70%);
+    pointer-events: none;
+    transition: background 0.5s;
+    z-index: 0;
+  }
+
+  body.fdm-mode::before {
+    background: radial-gradient(circle, rgba(56,189,248,0.07) 0%, transparent 70%);
+  }
+
+  .container { max-width: 800px; margin: 0 auto; position: relative; z-index: 1; }
+
+  /* Header */
+  header { margin-bottom: 2rem; }
+  .badge {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.15em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 0.5rem;
+    display: flex; align-items: center; gap: 0.5rem; transition: color 0.3s;
+  }
+  .badge::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    background: var(--accent); border-radius: 50%; animation: pulse 2s infinite;
+    transition: background 0.3s;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+  h1 { font-size: clamp(1.8rem,4vw,2.6rem); font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); transition: color 0.3s; }
+
+  /* Mode switcher */
+  .mode-switcher {
+    display: flex; gap: 0; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; margin-bottom: 1.25rem;
+  }
+  .mode-btn {
+    flex: 1; padding: 0.75rem 1rem;
+    background: transparent; border: none;
+    color: var(--muted); font-family: var(--sans); font-weight: 600;
+    font-size: 0.9rem; cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  }
+  .mode-btn .tag {
+    font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.08em;
+    padding: 0.15rem 0.4rem; border-radius: 3px;
+    background: var(--border); color: var(--muted); transition: all 0.2s;
+  }
+  .mode-btn.active { color: var(--text); background: rgba(255,255,255,0.04); }
+  .mode-btn.active.resin { color: var(--accent-r); }
+  .mode-btn.active.resin .tag { background: rgba(255,107,43,0.15); color: var(--accent-r); }
+  .mode-btn.active.fdm { color: var(--accent-f); }
+  .mode-btn.active.fdm .tag { background: rgba(56,189,248,0.15); color: var(--accent-f); }
+
+  /* Cards */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  @media(max-width:560px){ .grid{grid-template-columns:1fr} }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.25rem; transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #3a3a48; }
+  .card.full { grid-column: 1 / -1; }
+  .section-label {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.12em;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 1rem;
+    padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+  }
+
+  /* Fields */
+  .field { margin-bottom: 1rem; }
+  .field:last-child { margin-bottom: 0; }
+  label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.35rem; font-family: var(--mono); }
+  label strong { color: var(--text); font-weight: 400; }
+  .input-wrap {
+    display: flex; align-items: center; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: border-color 0.2s;
+  }
+  .input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.1); }
+  input[type="number"] {
+    background: transparent; border: none; outline: none; color: var(--text);
+    font-family: var(--mono); font-size: 1rem; padding: 0.6rem 0.75rem; width: 100%;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .unit {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--accent);
+    padding: 0 0.75rem; background: rgba(255,107,43,0.08);
+    height: 100%; display: flex; align-items: center;
+    border-left: 1px solid var(--border); white-space: nowrap; transition: all 0.3s;
+  }
+  body.fdm-mode .unit { color: var(--accent-f); background: rgba(56,189,248,0.08); }
+  body.fdm-mode .input-wrap:focus-within { border-color: var(--accent-f); box-shadow: 0 0 0 3px rgba(56,189,248,0.1); }
+
+  /* Sub-toggle for resin input mode */
+  .toggle-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .toggle-btn {
+    flex: 1; padding: 0.45rem; border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); border-radius: 6px; cursor: pointer;
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.05em;
+    transition: all 0.15s; text-transform: uppercase;
+  }
+  .toggle-btn.active { background: rgba(255,107,43,0.12); border-color: var(--accent-r); color: var(--accent-r); }
+
+  /* Calc button */
+  .calc-btn {
+    width: 100%; padding: 0.9rem; background: var(--accent); color: #fff;
+    border: none; border-radius: 10px; font-family: var(--sans);
+    font-weight: 800; font-size: 1rem; letter-spacing: 0.03em;
+    cursor: pointer; transition: all 0.2s; margin-top: 0.5rem;
+  }
+  .calc-btn:hover { filter: brightness(1.15); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  .calc-btn:active { transform: translateY(0); }
+
+  /* Advanced */
+  .params-toggle {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.1em;
+    color: var(--muted); text-transform: uppercase; text-align: center;
+    cursor: pointer; padding: 0.5rem; transition: color 0.2s;
+  }
+  .params-toggle:hover { color: var(--accent); }
+  .advanced { display: none; }
+  .advanced.open { display: block; }
+
+  /* Results */
+  .results { margin-top: 1.5rem; display: none; animation: fadeUp 0.4s ease both; }
+  .results.visible { display: block; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+  .result-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .result-header {
+    border-bottom: 1px solid var(--border); padding: 1rem 1.25rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .result-header.resin { background: linear-gradient(135deg, rgba(255,107,43,0.1), rgba(255,179,71,0.04)); }
+  .result-header.fdm   { background: linear-gradient(135deg, rgba(56,189,248,0.1), rgba(129,140,248,0.04)); }
+  .result-title { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; }
+  .result-subtitle { font-size: 0.8rem; color: var(--text); font-family: var(--mono); margin-top: 0.2rem; }
+  .result-time { font-family: var(--mono); font-size: 0.85rem; }
+
+  .breakdown { padding: 1.25rem; }
+  .step-label {
+    font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 0.6rem 0 0.3rem; color: var(--muted); opacity: 0.6;
+  }
+  .breakdown-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.86rem;
+  }
+  .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-row .lc { color: var(--muted); font-family: var(--mono); font-size: 0.76rem; display: flex; align-items: center; gap: 0.5rem; }
+  .breakdown-row .lc .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .breakdown-row .val { font-family: var(--mono); color: var(--text); }
+  .divider-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.65rem 0; border-top: 1px solid var(--border); border-bottom: 1px dashed var(--border); margin: 0.25rem 0;
+  }
+  .divider-row .lc { font-size: 0.82rem; font-weight: 600; color: var(--text); font-family: var(--mono); }
+  .divider-row .val { font-family: var(--mono); font-size: 0.95rem; color: var(--text); }
+
+  .options-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin: 0 1.25rem 0.75rem;
+  }
+  .option-box {
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem;
+    text-align: center; transition: all 0.2s;
+  }
+  .option-box.winner { border-color: var(--green); background: rgba(74,222,128,0.05); }
+  .option-label { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; margin-bottom: 0.3rem; }
+  .option-val { font-family: var(--mono); font-size: 1.1rem; color: var(--text); }
+  .option-box.winner .option-val { color: var(--green); }
+  .winner-tag { font-family: var(--mono); font-size: 0.55rem; color: var(--green); margin-top: 0.2rem; }
+
+  .final-row {
+    background: rgba(74,222,128,0.06); border: 1px solid rgba(74,222,128,0.2);
+    border-radius: 8px; padding: 1rem 1.25rem;
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 0 1.25rem 1.25rem;
+  }
+  .final-label { font-size: 0.82rem; font-weight: 600; color: var(--green); font-family: var(--mono); letter-spacing: 0.05em; }
+  .final-price { font-size: 1.9rem; font-weight: 800; color: var(--green); letter-spacing: -0.02em; }
+
+  .error {
+    background: rgba(255,80,80,0.1); border: 1px solid rgba(255,80,80,0.3);
+    border-radius: 8px; padding: 0.75rem 1rem;
+    font-family: var(--mono); font-size: 0.78rem; color: #ff8080;
+    margin-top: 0.75rem; display: none;
+  }
+  .error.visible { display: block; }
+
+  /* Panel visibility */
+  .resin-panel { display: block; }
+  .fdm-panel   { display: none; }
+  body.fdm-mode .resin-panel { display: none; }
+  body.fdm-mode .fdm-panel   { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="badge" id="badge-text">SLA / MSLA</div>
+    <h1>Calculadora<br><span id="h1-accent">Resina 3D</span></h1>
+  </header>
+
+  <!-- Mode switcher -->
+  <div class="mode-switcher">
+    <button class="mode-btn resin active" id="btn-resin" onclick="switchMode('resin')">
+      🧪 Resina <span class="tag">SLA/MSLA</span>
+    </button>
+    <button class="mode-btn fdm" id="btn-fdm" onclick="switchMode('fdm')">
+      🧵 Filamento <span class="tag">FDM</span>
+    </button>
+  </div>
+
+  <!-- ═══════════════ RESIN PANEL ═══════════════ -->
+  <div class="resin-panel">
+    <div class="card full">
+      <div class="section-label">Datos de la pieza</div>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="r-btn-va" onclick="setResinMode('va')">Volumen + Altura</button>
+        <button class="toggle-btn" id="r-btn-vt" onclick="setResinMode('vt')">Volumen + Tiempo</button>
+      </div>
+      <div class="grid" id="r-inputs-va">
+        <div class="field">
+          <label><strong>Volumen</strong> de resina</label>
+          <div class="input-wrap"><input type="number" id="r-vol" placeholder="50" min="0" step="0.1"><span class="unit">ml</span></div>
+        </div>
+        <div class="field">
+          <label><strong>Altura</strong> total de la pieza</label>
+          <div class="input-wrap"><input type="number" id="r-alt" placeholder="40" min="0" step="0.1"><span class="unit">mm</span></div>
+        </div>
+      </div>
+      <div class="grid" id="r-inputs-vt" style="display:none">
+        <div class="field">
+          <label><strong>Volumen</strong> de resina</label>
+          <div class="input-wrap"><input type="number" id="r-vol2" placeholder="50" min="0" step="0.1"><span class="unit">ml</span></div>
+        </div>
+        <div class="field">
+          <label><strong>Tiempo</strong> de impresión</label>
+          <div class="input-wrap"><input type="number" id="r-time" placeholder="3.6" min="0" step="0.1"><span class="unit">horas</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card full">
+      <div class="params-toggle" onclick="toggleAdv('r-adv')">⚙ Parámetros avanzados ▾</div>
+      <div class="advanced" id="r-adv">
+        <div style="height:.75rem"></div>
+        <div class="grid">
+          <div class="field"><label><strong>Precio resina</strong></label><div class="input-wrap"><input type="number" id="r-p-resina" value="40" min="0"><span class="unit">€/kg</span></div></div>
+          <div class="field"><label><strong>Consumibles fijos</strong></label><div class="input-wrap"><input type="number" id="r-p-cons" value="2" min="0" step="0.1"><span class="unit">€</span></div></div>
+          <div class="field"><label><strong>Potencia impresora</strong></label><div class="input-wrap"><input type="number" id="r-p-w" value="75" min="0" step="5"><span class="unit">W</span></div></div>
+          <div class="field"><label><strong>Precio electricidad</strong></label><div class="input-wrap"><input type="number" id="r-p-elec" value="0.25" min="0" step="0.01"><span class="unit">€/kWh</span></div></div>
+          <div class="field"><label><strong>Tasa de fallo</strong></label><div class="input-wrap"><input type="number" id="r-p-fallo" value="10" min="0" max="99"><span class="unit">%</span></div></div>
+          <div class="field"><label><strong>Margen de beneficio</strong></label><div class="input-wrap"><input type="number" id="r-p-margen" value="50" min="0" step="5"><span class="unit">%</span></div></div>
+        </div>
+      </div>
+    </div>
+    <button class="calc-btn" style="background:var(--accent-r)" onclick="calcResin()">Calcular precio →</button>
+    <div class="error" id="r-error"></div>
+
+    <!-- Resin results -->
+    <div class="results" id="r-results">
+      <div class="result-card">
+        <div class="result-header resin">
+          <div>
+            <div class="result-title">Resina SLA/MSLA</div>
+            <div class="result-subtitle" id="r-res-inputs"></div>
+          </div>
+          <div class="result-time" style="color:var(--accent-r2)" id="r-res-time"></div>
+        </div>
+        <div class="breakdown">
+          <div class="step-label">① Coste base</div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Resina</div><div class="val" id="r-r-resina"></div></div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Consumibles</div><div class="val" id="r-r-cons"></div></div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Electricidad</div><div class="val" id="r-r-elec"></div></div>
+          <div class="divider-row"><div class="lc">C_base</div><div class="val" id="r-r-base"></div></div>
+          <div class="step-label">② Ajuste por fallos</div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Tasa aplicada</div><div class="val" id="r-r-tasa"></div></div>
+          <div class="divider-row"><div class="lc">C_esperado</div><div class="val" id="r-r-esp"></div></div>
+          <div class="step-label">③ Margen de beneficio</div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Margen</div><div class="val" id="r-r-margen"></div></div>
+        </div>
+        <div class="final-row">
+          <div class="final-label">PRECIO FINAL</div>
+          <div class="final-price" id="r-r-final"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ FDM PANEL ═══════════════ -->
+  <div class="fdm-panel">
+    <div class="card full">
+      <div class="section-label">Datos de la pieza</div>
+      <div class="grid">
+        <div class="field">
+          <label><strong>Peso</strong> del filamento usado</label>
+          <div class="input-wrap"><input type="number" id="f-peso" placeholder="85" min="0" step="1"><span class="unit">g</span></div>
+        </div>
+        <div class="field">
+          <label><strong>Tiempo</strong> de impresión</label>
+          <div class="input-wrap"><input type="number" id="f-h" placeholder="3.5" min="0" step="0.1"><span class="unit">horas</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card full">
+      <div class="params-toggle" onclick="toggleAdv('f-adv')">⚙ Parámetros avanzados ▾</div>
+      <div class="advanced" id="f-adv">
+        <div style="height:.75rem"></div>
+        <div class="grid">
+          <div class="field"><label><strong>Precio filamento</strong></label><div class="input-wrap"><input type="number" id="f-p-fil" value="20" min="0"><span class="unit">€/kg</span></div></div>
+          <div class="field"><label><strong>Consumibles</strong> (% s/filamento)</label><div class="input-wrap"><input type="number" id="f-p-cons" value="5" min="0"><span class="unit">%</span></div></div>
+          <div class="field"><label><strong>Electricidad</strong></label><div class="input-wrap"><input type="number" id="f-p-elec" value="0.036244" min="0" step="0.001"><span class="unit">€/h</span></div></div>
+          <div class="field"><label><strong>Coste impresora</strong></label><div class="input-wrap"><input type="number" id="f-p-printer" value="250" min="0"><span class="unit">€</span></div></div>
+          <div class="field"><label><strong>Vida útil impresora</strong></label><div class="input-wrap"><input type="number" id="f-p-vida" value="3000" min="1"><span class="unit">h</span></div></div>
+          <div class="field"><label><strong>Desgaste plataforma</strong></label><div class="input-wrap"><input type="number" id="f-p-plat" value="0.04" min="0" step="0.01"><span class="unit">€/h</span></div></div>
+        </div>
+      </div>
+    </div>
+    <button class="calc-btn" style="background:var(--accent-f)" onclick="calcFDM()">Calcular precio →</button>
+    <div class="error" id="f-error"></div>
+
+    <!-- FDM results -->
+    <div class="results" id="f-results">
+      <div class="result-card">
+        <div class="result-header fdm">
+          <div>
+            <div class="result-title">Filamento FDM</div>
+            <div class="result-subtitle" id="f-res-inputs"></div>
+          </div>
+          <div class="result-time" style="color:var(--accent-f2)" id="f-res-time"></div>
+        </div>
+        <div class="breakdown">
+          <div class="step-label">① Costes de material</div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Filamento</div><div class="val" id="f-r-fil"></div></div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Consumibles</div><div class="val" id="f-r-cons"></div></div>
+          <div class="step-label">② Costes de máquina</div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Electricidad</div><div class="val" id="f-r-elec"></div></div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Amortización</div><div class="val" id="f-r-amort"></div></div>
+          <div class="breakdown-row"><div class="lc"><span class="dot"></span>Desgaste plataforma</div><div class="val" id="f-r-plat"></div></div>
+          <div class="divider-row"><div class="lc">C_total (coste real)</div><div class="val" id="f-r-total"></div></div>
+          <div class="step-label">③ Precio final — mayor de las dos opciones</div>
+        </div>
+        <div class="options-row">
+          <div class="option-box" id="f-box-a">
+            <div class="option-label">Opción A — ×1,5</div>
+            <div class="option-val" id="f-r-p1"></div>
+            <div class="winner-tag" id="f-tag-a"></div>
+          </div>
+          <div class="option-box" id="f-box-b">
+            <div class="option-label">Opción B — +5 €</div>
+            <div class="option-val" id="f-r-p2"></div>
+            <div class="winner-tag" id="f-tag-b"></div>
+          </div>
+        </div>
+        <div class="final-row">
+          <div class="final-label">PRECIO FINAL</div>
+          <div class="final-price" id="f-r-final"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const fmt = n => n.toFixed(2) + ' €';
+
+// ── Mode switcher ──────────────────────────────────────────────
+function switchMode(m) {
+  const isF = m === 'fdm';
+  document.body.classList.toggle('fdm-mode', isF);
+  document.getElementById('btn-resin').classList.toggle('active', !isF);
+  document.getElementById('btn-fdm').classList.toggle('active', isF);
+  document.getElementById('badge-text').textContent = isF ? 'FDM' : 'SLA / MSLA';
+  document.getElementById('h1-accent').textContent  = isF ? 'Filamento 3D' : 'Resina 3D';
+  // Update accent CSS var for unit bg
+  document.documentElement.style.setProperty('--accent', isF ? 'var(--accent-f)' : 'var(--accent-r)');
+}
+
+// ── Resin sub-toggle ───────────────────────────────────────────
+let resinMode = 'va';
+function setResinMode(m) {
+  resinMode = m;
+  document.getElementById('r-btn-va').classList.toggle('active', m==='va');
+  document.getElementById('r-btn-vt').classList.toggle('active', m==='vt');
+  document.getElementById('r-inputs-va').style.display = m==='va' ? '' : 'none';
+  document.getElementById('r-inputs-vt').style.display = m==='vt' ? '' : 'none';
+}
+
+function toggleAdv(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.classList.add('visible');
+}
+function hideErr(id) { document.getElementById(id).classList.remove('visible'); }
+
+function hm(h) {
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  return hh > 0 ? `${hh}h ${mm > 0 ? mm+'min' : ''}`.trim() : `${mm}min`;
+}
+
+// ── RESIN calc ─────────────────────────────────────────────────
+function calcResin() {
+  hideErr('r-error');
+  document.getElementById('r-results').classList.remove('visible');
+
+  const pResina = +document.getElementById('r-p-resina').value || 40;
+  const pCons   = +document.getElementById('r-p-cons').value ?? 2;
+  const watts   = +document.getElementById('r-p-w').value || 75;
+  const pElec   = +document.getElementById('r-p-elec').value || 0.25;
+  const fallo   = (+document.getElementById('r-p-fallo').value || 10) / 100;
+  const margen  = (+document.getElementById('r-p-margen').value || 50) / 100;
+
+  const cMl    = pResina * 0.0011;
+  const cElecH = (watts / 1000) * pElec;
+
+  let vol, T, desc;
+  if (resinMode === 'va') {
+    vol = +document.getElementById('r-vol').value;
+    const alt = +document.getElementById('r-alt').value;
+    if (!vol || !alt) { showErr('r-error','Introduce el volumen (ml) y la altura (mm).'); return; }
+    T = 0.09 * alt;
+    desc = `V=${vol} ml · H=${alt} mm`;
+  } else {
+    vol = +document.getElementById('r-vol2').value;
+    T   = +document.getElementById('r-time').value;
+    if (!vol || !T) { showErr('r-error','Introduce el volumen (ml) y el tiempo (h).'); return; }
+    desc = `V=${vol} ml · T=${T} h`;
+  }
+
+  const cResina = cMl * vol;
+  const cCons   = pCons;
+  const cElec   = cElecH * T;
+  const cBase   = cResina + cCons + cElec;
+  const cEsp    = cBase / (1 - fallo);
+  const cFinal  = cEsp * (1 + margen);
+
+  document.getElementById('r-res-inputs').textContent = desc;
+  document.getElementById('r-res-time').textContent   = '⏱ ' + hm(T);
+  document.getElementById('r-r-resina').textContent   = fmt(cResina);
+  document.getElementById('r-r-cons').textContent     = fmt(cCons);
+  document.getElementById('r-r-elec').textContent     = fmt(cElec);
+  document.getElementById('r-r-base').textContent     = fmt(cBase);
+  document.getElementById('r-r-tasa').textContent     = (fallo*100).toFixed(0)+'%  →  ÷'+(1-fallo).toFixed(2);
+  document.getElementById('r-r-esp').textContent      = fmt(cEsp);
+  document.getElementById('r-r-margen').textContent   = (margen*100).toFixed(0)+'%  →  ×'+(1+margen).toFixed(2);
+  document.getElementById('r-r-final').textContent    = cFinal.toFixed(2)+' €';
+  document.getElementById('r-results').classList.add('visible');
+}
+
+// ── FDM calc ───────────────────────────────────────────────────
+function calcFDM() {
+  hideErr('f-error');
+  document.getElementById('f-results').classList.remove('visible');
+
+  const peso    = +document.getElementById('f-peso').value;
+  const T = +document.getElementById('f-h').value;
+  if (!peso || !T) { showErr('f-error','Introduce el peso (g) y el tiempo (h).'); return; }
+
+  const pFil    = +document.getElementById('f-p-fil').value || 20;
+  const pCons   = (+document.getElementById('f-p-cons').value || 5) / 100;
+  const cElecH  = +document.getElementById('f-p-elec').value || 0.036244;
+  const printer = +document.getElementById('f-p-printer').value || 250;
+  const vida    = +document.getElementById('f-p-vida').value || 3000;
+  const cPlat   = +document.getElementById('f-p-plat').value || 0.04;
+
+  const cAmortH = printer / vida;
+  const cFil    = peso * (pFil / 1000);
+  const cCons   = cFil * pCons;
+  const cElec   = T * cElecH;
+  const cAmort  = T * cAmortH;
+  const cPlatT  = T * cPlat;
+  const cTotal  = cFil + cCons + cElec + cAmort + cPlatT;
+
+  const p1 = cTotal * 1.5;
+  const p2 = cTotal + 5;
+  const pFinal = Math.max(p1, p2);
+  const aWins  = p1 >= p2;
+
+  document.getElementById('f-res-inputs').textContent  = `${peso} g`;
+  document.getElementById('f-res-time').textContent    = '⏱ ' + hm(T) + ` (${T.toFixed(2)} h)`;
+  document.getElementById('f-r-fil').textContent       = fmt(cFil);
+  document.getElementById('f-r-cons').textContent      = fmt(cCons);
+  document.getElementById('f-r-elec').textContent      = fmt(cElec);
+  document.getElementById('f-r-amort').textContent     = fmt(cAmort);
+  document.getElementById('f-r-plat').textContent      = fmt(cPlatT);
+  document.getElementById('f-r-total').textContent     = fmt(cTotal);
+  document.getElementById('f-r-p1').textContent        = fmt(p1);
+  document.getElementById('f-r-p2').textContent        = fmt(p2);
+  document.getElementById('f-r-final').textContent     = pFinal.toFixed(2)+' €';
+
+  document.getElementById('f-box-a').classList.toggle('winner', aWins);
+  document.getElementById('f-box-b').classList.toggle('winner', !aWins);
+  document.getElementById('f-tag-a').textContent = aWins ? '✓ APLICADA' : '';
+  document.getElementById('f-tag-b').textContent = !aWins ? '✓ APLICADA' : '';
+
+  document.getElementById('f-results').classList.add('visible');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    document.body.classList.contains('fdm-mode') ? calcFDM() : calcResin();
+  }
+});
+</script>
+</body>
+</html>
